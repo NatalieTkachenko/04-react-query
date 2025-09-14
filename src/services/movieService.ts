@@ -11,19 +11,27 @@ const instance = axios.create({
   params: {},
 });
 
-interface FetchMoviesResponse {
+export interface FetchMoviesResponse {
   results: Movie[];
+  total_pages: number;
 }
 
-export const fetchMovies = async (query: string): Promise<Movie[]> => {
+export const fetchMovies = async (
+  query: string,
+  page: number
+): Promise<FetchMoviesResponse> => {
   console.log('I see your request ', query);
   try {
     const response = await instance.get<FetchMoviesResponse>(
-      `search/movie?query=${query}`
+      `search/movie?query=${query}&page=${page}`
     );
-    return response.data.results;
+
+    return {
+      results: response.data.results ?? [],
+      total_pages: response.data.total_pages ?? 0,
+    };
   } catch (error) {
     console.log(error);
-    return [];
+    throw error;
   }
 };

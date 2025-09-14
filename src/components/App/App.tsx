@@ -1,42 +1,45 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import toast, { Toaster } from 'react-hot-toast';
+import ReactPaginate from 'react-paginate';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { fetchMovies } from '../../services/movieService';
 
 import type { Movie } from '../../types/movie';
 
 import SearchBar from '../SearchBar/SearchBar';
-import './App.module.css';
+import style from './App.module.css';
 import MovieGrid from '../MovieGrid/MovieGrid';
 import Loader from '../Loader/Loader';
 import ErrorMessage from '../ErrorMessage/ErrorMessage';
 import MovieModal from '../MovieModal/MovieModal';
 
 function App() {
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isError, setError] = useState<boolean>(false);
+  // const [movies, setMovies] = useState<Movie[]>([]);
+  // const [isLoading, setIsLoading] = useState<boolean>(false);
+  // const [isError, setError] = useState<boolean>(false);
   const [modalIsOpen, setModalIsOpen] = useState<boolean>(false);
   const [movie, setMovie] = useState<Movie | null>(null);
+  const [query, setQuery] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
-  const handleSubmit = async (query: string) => {
-    try {
-      setMovies([]);
-      setIsLoading(true);
-      setError(false);
-      const data = await fetchMovies(query);
+  const { data, isLoading, isError, isFetchedAfterMount } = useQuery({
+    queryKey: ['movies', query, currentPage],
+    queryFn: () => fetchMovies(query, currentPage),
+    enabled: query !== '',
+    placeholderData: keepPreviousData,
+  });
 
-      if (data?.length === 0) {
-        toast.error('No movies found for your request.', {
-          duration: 1500,
-        });
-        return;
-      } else setMovies(data);
-    } catch {
-      setError(true);
-    } finally {
-      setIsLoading(false);
+  useEffect(() => {
+    if (isFetchedAfterMount && data?.results.length === 0) {
+      toast.error('No movies found for your request.', {
+        duration: 1500,
+      });
     }
+  }, [data, isFetchedAfterMount]);
+
+  const handleSubmit = (query: string) => {
+    setQuery(query);
   };
 
   const handleSelect = (movie: Movie) => {
@@ -54,9 +57,23 @@ function App() {
     <>
       <SearchBar onSubmit={handleSubmit} />
       <Toaster />
+      {data?.results ? (
+        <ReactPaginate
+          pageCount={data?.total_pages ?? 0}
+          pageRangeDisplayed={5}
+          marginPagesDisplayed={1}
+          onPageChange={({ selected }) => setCurrentPage(selected + 1)}
+          forcePage={currentPage - 1}
+          containerClassName={style.pagination}
+          activeClassName={style.active}
+          nextLabel="→"
+          previousLabel="←"
+        />
+      ) : null}
+
       {isLoading ? <Loader /> : null}
-      {movies.length > 0 && (
-        <MovieGrid movies={movies} onSelect={handleSelect} />
+      {(data?.results?.length ?? 0) > 0 && (
+        <MovieGrid movies={data!.results} onSelect={handleSelect} />
       )}
       {isError ? <ErrorMessage /> : null}
       {modalIsOpen && movie ? (
